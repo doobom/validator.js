@@ -1,56 +1,68 @@
-var validator = require('../index');
-var format = require('util').format;
+import { format } from 'util';
+import validator from '../src/index';
 
 function test(options) {
-  var args = options.args || [];
+  let args = options.args || [];
 
   args.unshift(null);
 
-  Object.keys(options.expect).forEach(function (input) {
+  Object.keys(options.expect).forEach((input) => {
     args[0] = input;
-    var result = validator[options.sanitizer](...args);
-    var expected = options.expect[input];
+    let result = validator[options.sanitizer](...args);
+    let expected = options.expect[input];
     if (isNaN(result) && !result.length && isNaN(expected)) {
       return;
     }
 
     if (result !== expected) {
-      var warning = format('validator.%s(%s) returned "%s" but should have returned "%s"',
-        options.sanitizer, args.join(', '), result, expected);
+      let warning = format(
+        'validator.%s(%s) returned "%s" but should have returned "%s"',
+        options.sanitizer, args.join(', '), result, expected
+      );
 
       throw new Error(warning);
     }
   });
 }
 
-describe('Sanitizers', function () {
-  it('should sanitize boolean strings', function () {
+describe('Sanitizers', () => {
+  it('should sanitize boolean strings', () => {
     test({
       sanitizer: 'toBoolean',
       expect: {
-        '0': false,
+        0: false,
         '': false,
-        '1': true,
-        'true': true,
-        'foobar': true,
+        1: true,
+        true: true,
+        True: true,
+        TRUE: true,
+        foobar: true,
         '   ': true,
+        false: false,
+        False: false,
+        FALSE: false,
       },
     });
     test({
       sanitizer: 'toBoolean',
       args: [true], // strict
       expect: {
-        '0': false,
+        0: false,
         '': false,
-        '1': true,
-        'true': true,
-        'foobar': false,
+        1: true,
+        true: true,
+        True: true,
+        TRUE: true,
+        foobar: false,
         '   ': false,
+        false: false,
+        False: false,
+        FALSE: false,
       },
     });
   });
 
-  it('should trim whitespace', function () {
+  it('should trim whitespace', () => {
     test({
       sanitizer: 'trim',
       expect: {
@@ -76,7 +88,7 @@ describe('Sanitizers', function () {
     });
   });
 
-  it('should trim custom characters', function () {
+  it('should trim custom characters', () => {
     test({
       sanitizer: 'trim',
       args: ['01'],
@@ -90,44 +102,58 @@ describe('Sanitizers', function () {
     });
 
     test({
+      sanitizer: 'ltrim',
+      args: ['\\S'],
+      expect: { '\\S01010020100001': '01010020100001' },
+    });
+
+
+    test({
       sanitizer: 'rtrim',
       args: ['01'],
       expect: { '010100201000': '0101002' },
     });
+
+    test({
+      sanitizer: 'rtrim',
+      args: ['\\S'],
+      expect: { '01010020100001\\S': '01010020100001' },
+    });
   });
 
-  it('should convert strings to integers', function () {
+  it('should convert strings to integers', () => {
     test({
       sanitizer: 'toInt',
       expect: {
-        '3': 3,
+        3: 3,
         ' 3 ': 3,
-        '2.4': 2,
-        'foo': NaN,
+        2.4: 2,
+        foo: NaN,
       },
     });
 
     test({
       sanitizer: 'toInt',
       args: [16],
-      expect: { 'ff': 255 },
+      expect: { ff: 255 },
     });
   });
 
-  it('should convert strings to floats', function () {
+  it('should convert strings to floats', () => {
     test({
       sanitizer: 'toFloat',
       expect: {
-        '2': 2.0,
+        2: 2.0,
         '2.': 2.0,
         '-2.5': -2.5,
         '.5': 0.5,
-        'foo': NaN,
+        '2020-01-06T14:31:00.135Z': NaN,
+        foo: NaN,
       },
     });
   });
 
-  it('should escape HTML', function () {
+  it('should escape HTML', () => {
     test({
       sanitizer: 'escape',
       expect: {
@@ -146,7 +172,7 @@ describe('Sanitizers', function () {
     });
   });
 
-  it('should unescape HTML', function () {
+  it('should unescape HTML', () => {
     test({
       sanitizer: 'unescape',
       expect: {
@@ -162,7 +188,7 @@ describe('Sanitizers', function () {
     });
   });
 
-  it('should remove control characters (<32 and 127)', function () {
+  it('should remove control characters (<32 and 127)', () => {
     // Check basic functionality
     test({
       sanitizer: 'stripLow',
@@ -177,7 +203,7 @@ describe('Sanitizers', function () {
     test({
       sanitizer: 'stripLow',
       expect: {
-        'perch\u00e9': 'perch\u00e9',
+        perché: 'perch\u00e9',
         '\u20ac': '\u20ac',
         '\u2206\x0A': '\u2206',
         '\ud83d\ude04': '\ud83d\ude04',
@@ -194,33 +220,69 @@ describe('Sanitizers', function () {
     });
   });
 
-  it('should sanitize a string based on a whitelist', function () {
+  it('should sanitize a string based on a whitelist', () => {
     test({
       sanitizer: 'whitelist',
       args: ['abc'],
       expect: {
-        'abcdef': 'abc',
-        'aaaaaaaaaabbbbbbbbbb': 'aaaaaaaaaabbbbbbbbbb',
-        'a1b2c3': 'abc',
+        abcdef: 'abc',
+        aaaaaaaaaabbbbbbbbbb: 'aaaaaaaaaabbbbbbbbbb',
+        a1b2c3: 'abc',
         '   ': '',
       },
     });
   });
 
-  it('should sanitize a string based on a blacklist', function () {
+  it('should sanitize a string based on a blacklist', () => {
     test({
       sanitizer: 'blacklist',
       args: ['abc'],
       expect: {
-        'abcdef': 'def',
-        'aaaaaaaaaabbbbbbbbbb': '',
-        'a1b2c3': '123',
+        abcdef: 'def',
+        aaaaaaaaaabbbbbbbbbb: '',
+        a1b2c3: '123',
         '   ': '   ',
       },
     });
   });
 
-  it('should normalize an email based on domain', function () {
+  it('should score passwords', () => {
+    test({
+      sanitizer: 'isStrongPassword',
+      args: [{
+        returnScore: true,
+        pointsPerUnique: 1,
+        pointsPerRepeat: 0.5,
+        pointsForContainingLower: 10,
+        pointsForContainingUpper: 10,
+        pointsForContainingNumber: 10,
+        pointsForContainingSymbol: 10,
+      }],
+      expect: {
+        abc: 13,
+        abcc: 13.5,
+        aBc: 23,
+        'Abc123!': 47,
+        '!@#$%^&*()': 20,
+      },
+    });
+  });
+
+  it('should score passwords with default options', () => {
+    test({
+      sanitizer: 'isStrongPassword',
+      expect: {
+        abc: false,
+        abcc: false,
+        aBc: false,
+        'Abc123!': false,
+        '!@#$%^&*()': false,
+        'abc123!@f#rA': true,
+      },
+    });
+  });
+
+  it('should normalize an email based on domain', () => {
     test({
       sanitizer: 'normalizeEmail',
       expect: {
@@ -235,16 +297,19 @@ describe('Sanitizers', function () {
         'some.name.midd.leNa.me.+extension@GoogleMail.com': 'somenamemiddlename@gmail.com',
         'some.name+extension@unknown.com': 'some.name+extension@unknown.com',
         'hans@m端ller.com': 'hans@m端ller.com',
-        'an invalid email address': false,
-        '': false,
-        '+extension@gmail.com': false,
-        '...@gmail.com': false,
-        '.+extension@googlemail.com': false,
-        '+a@icloud.com': false,
-        '+a@outlook.com': false,
-        '-a@yahoo.com': false,
-        'some.name.midd..leNa...me...+extension@GoogleMail.com': 'somenamemiddlename@gmail.com',
+        'some.name.midd..leNa...me...+extension@GoogleMail.com': 'somenamemidd..lena...me...@gmail.com',
+        'matthew..example@gmail.com': 'matthew..example@gmail.com',
         '"foo@bar"@baz.com': '"foo@bar"@baz.com',
+        'test@ya.ru': 'test@yandex.ru',
+        'test@yandex.kz': 'test@yandex.ru',
+        'test@yandex.ru': 'test@yandex.ru',
+        'test@yandex.ua': 'test@yandex.ru',
+        'test@yandex.com': 'test@yandex.ru',
+        'test@yandex.by': 'test@yandex.ru',
+        '@gmail.com': false,
+        '@icloud.com': false,
+        '@outlook.com': false,
+        '@yahoo.com': false,
       },
     });
 
@@ -267,6 +332,7 @@ describe('Sanitizers', function () {
         'SOME.name@yahoo.ca': 'some.name@yahoo.ca',
         'SOME.name@outlook.ie': 'some.name@outlook.ie',
         'SOME.name@me.com': 'some.name@me.com',
+        'SOME.name@yandex.ru': 'some.name@yandex.ru',
       },
     });
 
@@ -279,6 +345,7 @@ describe('Sanitizers', function () {
         icloud_lowercase: false,
         outlookdotcom_lowercase: false,
         yahoo_lowercase: false,
+        yandex_lowercase: false,
       }],
       expect: {
         'TEST@FOO.COM': 'TEST@foo.com', // all_lowercase
@@ -288,6 +355,7 @@ describe('Sanitizers', function () {
         'ME@outlook.COM': 'ME@outlook.com', // outlookdotcom_lowercase
         'JOHN@live.CA': 'JOHN@live.ca', // outlookdotcom_lowercase
         'ME@ymail.COM': 'ME@ymail.com', // yahoo_lowercase
+        'ME@yandex.RU': 'ME@yandex.ru', // yandex_lowercase
       },
     });
 
@@ -334,6 +402,7 @@ describe('Sanitizers', function () {
       expect: {
         'SOME.name@GMAIL.com': 'somename@gmail.com',
         'SOME.name+me@GMAIL.com': 'somename@gmail.com',
+        'some.name..multiple@gmail.com': 'somename..multiple@gmail.com',
         'my.self@foo.com': 'my.self@foo.com',
       },
     });
